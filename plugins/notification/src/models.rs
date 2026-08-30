@@ -307,24 +307,28 @@ impl ActiveNotification {
     }
 }
 
-#[cfg(mobile)]
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(not(mobile), derive(Deserialize))]
 #[serde(rename_all = "camelCase")]
 pub struct ActionType {
     id: String,
     actions: Vec<Action>,
+    #[cfg_attr(not(mobile), serde(default))]
     hidden_previews_body_placeholder: Option<String>,
+    #[cfg_attr(not(mobile), serde(default))]
     custom_dismiss_action: bool,
+    #[cfg_attr(not(mobile), serde(default))]
     allow_in_car_play: bool,
+    #[cfg_attr(not(mobile), serde(default))]
     hidden_previews_show_title: bool,
+    #[cfg_attr(not(mobile), serde(default))]
     hidden_previews_show_subtitle: bool,
 }
 
-#[cfg(mobile)]
+
 #[derive(Debug)]
 pub struct ActionTypeBuilder(ActionType);
 
-#[cfg(mobile)]
 impl ActionType {
     pub fn builder(id: impl Into<String>) -> ActionTypeBuilder {
         ActionTypeBuilder(Self {
@@ -367,7 +371,6 @@ impl ActionType {
     }
 }
 
-#[cfg(mobile)]
 impl ActionTypeBuilder {
     pub fn actions(mut self, actions: Vec<Action>) -> Self {
         self.0.actions = actions;
@@ -409,25 +412,29 @@ impl ActionTypeBuilder {
     }
 }
 
-#[cfg(mobile)]
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(not(mobile), derive(Deserialize))]
 #[serde(rename_all = "camelCase")]
 pub struct Action {
     id: String,
     title: String,
+    #[cfg_attr(not(mobile), serde(default))]
     requires_authentication: bool,
+    #[cfg_attr(not(mobile), serde(default))]
     foreground: bool,
+    #[cfg_attr(not(mobile), serde(default))]
     destructive: bool,
+    #[cfg_attr(not(mobile), serde(default))]
     input: bool,
+    #[cfg_attr(not(mobile), serde(default))]
     input_button_title: Option<String>,
+    #[cfg_attr(not(mobile), serde(default))]
     input_placeholder: Option<String>,
 }
 
-#[cfg(mobile)]
 #[derive(Debug)]
 pub struct ActionBuilder(Action);
 
-#[cfg(mobile)]
 impl Action {
     pub fn builder(id: impl Into<String>, title: impl Into<String>) -> ActionBuilder {
         ActionBuilder(Self {
@@ -475,7 +482,6 @@ impl Action {
     }
 }
 
-#[cfg(mobile)]
 impl ActionBuilder {
     pub fn requires_authentication(mut self, requires_authentication: bool) -> Self {
         self.0.requires_authentication = requires_authentication;
