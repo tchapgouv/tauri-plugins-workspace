@@ -30,9 +30,7 @@ tauri-plugin-http = { path = "../../../plugins/http", features = [
   "multipart",
   "cookies",
 ], version = "2.5.9" }
-tauri-plugin-notification = { path = "../../../plugins/notification", version = "2.3.3", features = [
-  "windows7-compat",
-] }
+tauri-plugin-notification = { path = "../../../plugins/notification", version = "2.3.3", features = [] }
 tauri-plugin-os = { path = "../../../plugins/os", version = "2.3.2" }
 tauri-plugin-process = { path = "../../../plugins/process", version = "2.3.1" }
 tauri-plugin-opener = { path = "../../../plugins/opener", version = "2.5.4" }
