@@ -234,7 +234,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             #[cfg(desktop)]
             commands::register_listener,
             #[cfg(desktop)]
-            commands::remove_listener
+            commands::remove_listener,
+            #[cfg(desktop)]
+            commands::get_active,
+            #[cfg(desktop)]
+            commands::remove_active
         ])
         .js_init_script(include_str!("init-iife.js").replace(
             "__TEMPLATE_windows__",

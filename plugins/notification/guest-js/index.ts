@@ -586,6 +586,38 @@ async function setOnActionPerformed(
   return await addPluginListener('notification', 'actionPerformed', cb)
 }
 
+/**
+ * Gets all delivered notifications.
+ * On desktop this always returns an empty array.
+ *
+ * @since 2.0.0
+ */
+async function getDeliveredNotifications(): Promise<ActiveNotification[]> {
+  return await active()
+}
+
+/**
+ * Removes the delivered notifications with the given ids.
+ * On desktop this is a no-op.
+ *
+ * @since 2.0.0
+ */
+async function removeDeliveredNotifications(
+  notifications: Array<{ id: number; tag?: string }>
+): Promise<void> {
+  return await removeActive(notifications)
+}
+
+/**
+ * Removes all delivered notifications.
+ * On desktop this is a no-op.
+ *
+ * @since 2.0.0
+ */
+async function removeAllDeliveredNotifications(): Promise<void> {
+  return await removeAllActive()
+}
+
 export type {
   Attachment,
   Options,
@@ -616,6 +648,9 @@ export {
   onNotificationReceived,
   onAction,
   setOnActionPerformed,
+  getDeliveredNotifications,
+  removeDeliveredNotifications,
+  removeAllDeliveredNotifications,
   Schedule,
   ScheduleEvery
 }

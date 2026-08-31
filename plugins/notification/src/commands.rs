@@ -4,7 +4,7 @@
 
 use tauri::{command, ipc::Channel, plugin::PermissionState, AppHandle, Runtime, State};
 
-use crate::{models::ActionType, Notification, NotificationData, Result};
+use crate::{models::ActionType, ActiveNotification, Notification, NotificationData, Result};
 
 #[command]
 pub(crate) async fn is_permission_granted<R: Runtime>(
@@ -69,5 +69,24 @@ pub(crate) async fn remove_listener<R: Runtime>(
     channel_id: u32,
 ) -> Result<()> {
     notification.remove_event_listener(&event, channel_id);
+    Ok(())
+}
+
+#[cfg(desktop)]
+#[command]
+pub(crate) async fn get_active<R: Runtime>(
+    _app: AppHandle<R>,
+    _notification: State<'_, Notification<R>>,
+) -> Result<Vec<ActiveNotification>> {
+    Ok(Vec::new())
+}
+
+#[cfg(desktop)]
+#[command]
+pub(crate) async fn remove_active<R: Runtime>(
+    _app: AppHandle<R>,
+    _notification: State<'_, Notification<R>>,
+    #[allow(unused_variables)] notifications: Option<Vec<i32>>,
+) -> Result<()> {
     Ok(())
 }

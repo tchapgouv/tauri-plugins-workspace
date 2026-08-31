@@ -236,7 +236,7 @@ impl PendingNotification {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ActiveNotification {
     id: i32,
