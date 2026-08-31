@@ -3,24 +3,69 @@
 // SPDX-License-Identifier: MIT
 
 use serde::de::DeserializeOwned;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use tauri::{
+    ipc::Channel,
     plugin::{PermissionState, PluginApi},
     AppHandle, Runtime,
 };
 
 use crate::NotificationBuilder;
 
+/// Registered plugin event listeners, keyed by event name.
+type EventListeners = Arc<Mutex<HashMap<String, Vec<Channel<serde_json::Value>>>>>;
+
 pub fn init<R: Runtime, C: DeserializeOwned>(
     app: &AppHandle<R>,
     _api: PluginApi<R, C>,
 ) -> crate::Result<Notification<R>> {
-    Ok(Notification(app.clone()))
+    Ok(Notification::new(app.clone()))
 }
 
 /// Access to the notification APIs.
 ///
 /// You can get an instance of this type via [`NotificationExt`](crate::NotificationExt)
-pub struct Notification<R: Runtime>(AppHandle<R>);
+pub struct Notification<R: Runtime> {
+    app: AppHandle<R>,
+    event_listeners: EventListeners,
+}
+
+impl<R: Runtime> Notification<R> {
+    fn new(app: AppHandle<R>) -> Self {
+        Self {
+            app,
+            event_listeners: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// Registers a listener channel for the given event name.
+    pub fn register_event_listener(&self, event: String, channel: Channel<serde_json::Value>) {
+        self.event_listeners
+            .lock()
+            .unwrap()
+            .entry(event)
+            .or_default()
+            .push(channel);
+    }
+
+    /// Removes the listener channel with the given id from the given event.
+    pub fn remove_event_listener(&self, event: &str, channel_id: u32) {
+        if let Some(channels) = self.event_listeners.lock().unwrap().get_mut(event) {
+            channels.retain(|c| c.id() != channel_id);
+        }
+    }
+
+    /// Emits the given event payload to all registered listeners of this event.
+    #[allow(dead_code)]
+    pub(crate) fn emit_to_listeners(&self, event: &str, payload: serde_json::Value) {
+        if let Some(channels) = self.event_listeners.lock().unwrap().get(event) {
+            for channel in channels {
+                let _ = channel.send(payload.clone());
+            }
+        }
+    }
+}
 
 impl<R: Runtime> crate::NotificationBuilder<R> {
     pub fn show(self) -> crate::Result<()> {
@@ -55,7 +100,7 @@ impl<R: Runtime> crate::NotificationBuilder<R> {
 
 impl<R: Runtime> Notification<R> {
     pub fn builder(&self) -> NotificationBuilder<R> {
-        NotificationBuilder::new(self.0.clone())
+        NotificationBuilder::new(self.app.clone())
     }
 
     pub fn request_permission(&self) -> crate::Result<PermissionState> {

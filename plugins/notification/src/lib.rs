@@ -228,7 +228,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             commands::notify,
             commands::request_permission,
-            commands::is_permission_granted
+            commands::is_permission_granted,
+            #[cfg(desktop)]
+            commands::register_listener,
+            #[cfg(desktop)]
+            commands::remove_listener
         ])
         .js_init_script(include_str!("init-iife.js").replace(
             "__TEMPLATE_windows__",
