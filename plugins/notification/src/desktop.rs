@@ -11,7 +11,7 @@ use tauri::{
     AppHandle, Runtime,
 };
 
-use crate::NotificationBuilder;
+use crate::{models::ActionType, NotificationBuilder};
 
 /// Registered plugin event listeners, keyed by event name.
 type EventListeners = Arc<Mutex<HashMap<String, Vec<Channel<serde_json::Value>>>>>;
@@ -28,6 +28,7 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 /// You can get an instance of this type via [`NotificationExt`](crate::NotificationExt)
 pub struct Notification<R: Runtime> {
     app: AppHandle<R>,
+    action_types: Arc<Mutex<HashMap<String, ActionType>>>,
     event_listeners: EventListeners,
 }
 
@@ -35,6 +36,7 @@ impl<R: Runtime> Notification<R> {
     fn new(app: AppHandle<R>) -> Self {
         Self {
             app,
+            action_types: Arc::new(Mutex::new(HashMap::new())),
             event_listeners: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -64,6 +66,31 @@ impl<R: Runtime> Notification<R> {
                 let _ = channel.send(payload.clone());
             }
         }
+    }
+
+    /// Registers action types for use with `actionTypeId` on desktop.
+    pub fn register_action_types(&self, types: Vec<ActionType>) -> crate::Result<()> {
+        let mut map = self.action_types.lock().unwrap();
+        for action_type in types {
+            map.insert(action_type.id().to_string(), action_type);
+        }
+        Ok(())
+    }
+
+    /// Resolves the registered actions for a given action type id.
+    #[allow(dead_code)]
+    pub(crate) fn resolve_actions(&self, action_type_id: &str) -> Vec<(String, String)> {
+        self.action_types
+            .lock()
+            .unwrap()
+            .get(action_type_id)
+            .map(|at| {
+                at.actions()
+                    .iter()
+                    .map(|a| (a.id().to_string(), a.title().to_string()))
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 }
 

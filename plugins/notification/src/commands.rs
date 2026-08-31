@@ -4,7 +4,7 @@
 
 use tauri::{command, ipc::Channel, plugin::PermissionState, AppHandle, Runtime, State};
 
-use crate::{Notification, NotificationData, Result};
+use crate::{models::ActionType, Notification, NotificationData, Result};
 
 #[command]
 pub(crate) async fn is_permission_granted<R: Runtime>(
@@ -36,6 +36,16 @@ pub(crate) async fn notify<R: Runtime>(
     let mut builder = notification.builder();
     builder.data = options;
     builder.show()
+}
+
+#[cfg(desktop)]
+#[command]
+pub(crate) async fn register_action_types<R: Runtime>(
+    _app: AppHandle<R>,
+    notification: State<'_, Notification<R>>,
+    types: Vec<ActionType>,
+) -> Result<()> {
+    notification.register_action_types(types)
 }
 
 #[cfg(desktop)]

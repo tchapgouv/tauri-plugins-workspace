@@ -230,6 +230,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::request_permission,
             commands::is_permission_granted,
             #[cfg(desktop)]
+            commands::register_action_types,
+            #[cfg(desktop)]
             commands::register_listener,
             #[cfg(desktop)]
             commands::remove_listener
