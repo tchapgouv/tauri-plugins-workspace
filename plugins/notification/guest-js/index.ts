@@ -573,6 +573,19 @@ async function onAction(
   return await addPluginListener('notification', 'actionPerformed', cb)
 }
 
+/**
+ * Listen for when an action is performed on a notification.
+ * Provides the same functionality as {@link onAction} under the Capacitor
+ * {@code setOnActionPerformed} API name.
+ *
+ * @since 2.0.0
+ */
+async function setOnActionPerformed(
+  cb: (notification: Options) => void
+): Promise<PluginListener> {
+  return await addPluginListener('notification', 'actionPerformed', cb)
+}
+
 export type {
   Attachment,
   Options,
@@ -602,6 +615,7 @@ export {
   channels,
   onNotificationReceived,
   onAction,
+  setOnActionPerformed,
   Schedule,
   ScheduleEvery
 }
