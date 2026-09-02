@@ -1,20 +1,8 @@
 <script>
-  import { sendNotification } from '@tauri-apps/plugin-notification'
   export let onMessage
 
   let sound = ''
 
-  // send the notification directly
-  // the backend is responsible for checking the permission
-  function _sendNotification() {
-    sendNotification({
-      title: 'Notification title',
-      body: 'This is the notification body',
-      sound: sound || null
-    })
-  }
-
-  // alternatively, check the permission ourselves
   function triggerNotification() {
     if (Notification.permission === 'default') {
       Notification.requestPermission()
@@ -30,6 +18,21 @@
       _sendNotification()
     } else {
       onMessage('Permission is denied')
+    }
+  }
+
+  function _sendNotification() {
+    const notification = new Notification('Notification title', {
+      body: 'This is the notification body',
+      sound: sound || undefined
+    })
+
+    notification.onclick = function () {
+      onMessage('notification onclick')
+    }
+
+    notification.onclose = function () {
+      onMessage('notification onclose')
     }
   }
 </script>
