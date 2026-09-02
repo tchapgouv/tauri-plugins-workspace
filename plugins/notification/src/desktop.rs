@@ -8,12 +8,42 @@ use std::sync::{Arc, Mutex};
 use tauri::{
     ipc::Channel,
     plugin::{PermissionState, PluginApi},
-    AppHandle, Runtime,
+    AppHandle, Manager, Runtime,
 };
 
 use crate::NotificationBuilder;
 
 type EventListeners = Arc<Mutex<HashMap<String, Vec<Channel<serde_json::Value>>>>>;
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ActionPerformedNotification {
+    id: i32,
+    title: Option<String>,
+    body: Option<String>,
+    action_type_id: Option<String>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    extra: HashMap<String, serde_json::Value>,
+}
+
+#[allow(dead_code)]
+fn emit_action_performed<R: Runtime>(
+    app: &AppHandle<R>,
+    action_id: &str,
+    input_value: Option<String>,
+    payload: &ActionPerformedNotification,
+) -> crate::Result<()> {
+    let notification = app.state::<Notification<R>>().inner();
+    let mut value = serde_json::to_value(payload)?;
+    if let serde_json::Value::Object(ref mut map) = value {
+        map.insert("actionId".to_string(), action_id.into());
+        if let Some(v) = input_value {
+            map.insert("inputValue".to_string(), v.into());
+        }
+    }
+    notification.emit_to_listeners("actionPerformed", value);
+    Ok(())
+}
 
 pub fn init<R: Runtime, C: DeserializeOwned>(
     app: &AppHandle<R>,
@@ -40,19 +70,38 @@ impl<R: Runtime> crate::NotificationBuilder<R> {
         if let Some(title) = self
             .data
             .title
-            .or_else(|| self.app.config().product_name.clone())
+            .as_ref()
+            .or_else(|| self.app.config().product_name.as_ref())
         {
-            notification = notification.title(title);
+            notification = notification.title(title.clone());
         }
-        if let Some(body) = self.data.body {
-            notification = notification.body(body);
+        if let Some(body) = self.data.body.as_ref() {
+            notification = notification.body(body.clone());
         }
-        if let Some(icon) = self.data.icon {
-            notification = notification.icon(icon);
+        if let Some(icon) = self.data.icon.as_ref() {
+            notification = notification.icon(icon.clone());
         }
-        if let Some(sound) = self.data.sound {
-            notification = notification.sound(sound);
+        if let Some(sound) = self.data.sound.as_ref() {
+            notification = notification.sound(sound.clone());
         }
+
+        #[cfg(not(feature = "windows7-compat"))]
+        {
+            let payload = ActionPerformedNotification {
+                id: self.data.id,
+                title: self.data.title.clone(),
+                body: self.data.body.clone(),
+                action_type_id: self.data.action_type_id.clone(),
+                extra: self.data.extra.clone(),
+            };
+            let app_handle = self.app.clone();
+            notification = notification.action_payload(payload).action_emitter(
+                move |action_id, input_value, payload| {
+                    emit_action_performed(&app_handle, action_id, input_value, payload)
+                },
+            );
+        }
+
         #[cfg(feature = "windows7-compat")]
         {
             notification.notify(&self.app)?;
@@ -77,11 +126,7 @@ impl<R: Runtime> Notification<R> {
         Ok(PermissionState::Granted)
     }
 
-    pub fn register_event_listener(
-        &self,
-        event: String,
-        channel: Channel<serde_json::Value>,
-    ) {
+    pub fn register_event_listener(&self, event: String, channel: Channel<serde_json::Value>) {
         if let Ok(mut guard) = self.event_listeners.lock() {
             guard.entry(event).or_default().push(channel);
         }
@@ -113,6 +158,11 @@ mod imp {
     #[cfg(windows)]
     use std::path::MAIN_SEPARATOR as SEP;
 
+    type ActionEmitter = Box<
+        dyn Fn(&str, Option<String>, &super::ActionPerformedNotification) -> crate::Result<()>
+            + Send,
+    >;
+
     /// The desktop notification definition.
     ///
     /// Allows you to construct a Notification data and send it.
@@ -137,7 +187,7 @@ mod imp {
     /// app.run(|_app_handle, _event| {});
     /// ```
     #[allow(dead_code)]
-    #[derive(Debug, Default)]
+    #[derive(Default)]
     pub struct Notification {
         /// The notification body.
         body: Option<String>,
@@ -149,6 +199,24 @@ mod imp {
         sound: Option<String>,
         /// The notification identifier
         identifier: String,
+        /// Payload forwarded when an action is performed.
+        action_payload: Option<super::ActionPerformedNotification>,
+        /// Closure called when an action is performed.
+        action_emitter: Option<ActionEmitter>,
+    }
+
+    impl std::fmt::Debug for Notification {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("Notification")
+                .field("body", &self.body)
+                .field("title", &self.title)
+                .field("icon", &self.icon)
+                .field("sound", &self.sound)
+                .field("identifier", &self.identifier)
+                .field("action_payload", &self.action_payload)
+                .field("action_emitter", &self.action_emitter.is_some())
+                .finish()
+        }
     }
 
     impl Notification {
@@ -185,6 +253,27 @@ mod imp {
         #[must_use]
         pub fn sound(mut self, sound: impl Into<String>) -> Self {
             self.sound = Some(sound.into());
+            self
+        }
+
+        /// Sets the action payload.
+        #[cfg(not(feature = "windows7-compat"))]
+        #[must_use]
+        pub fn action_payload(mut self, payload: super::ActionPerformedNotification) -> Self {
+            self.action_payload = Some(payload);
+            self
+        }
+
+        /// Sets the action emitter.
+        #[cfg(not(feature = "windows7-compat"))]
+        #[must_use]
+        pub fn action_emitter(
+            mut self,
+            emitter: impl Fn(&str, Option<String>, &super::ActionPerformedNotification) -> crate::Result<()>
+                + Send
+                + 'static,
+        ) -> Self {
+            self.action_emitter = Some(ActionEmitter::from(Box::new(emitter)));
             self
         }
 
@@ -253,9 +342,55 @@ mod imp {
                 });
             }
 
-            tauri::async_runtime::spawn(async move {
-                let _ = notification.show();
-            });
+            // XDG only: the server reports a body click only if a "default" action exists,
+            // and per spec "default" is not rendered as a button. On macOS every declared
+            // action becomes a visible button, and Windows reports body clicks natively.
+            #[cfg(all(unix, not(target_os = "macos")))]
+            notification.action("default", "");
+
+            #[cfg(not(feature = "windows7-compat"))]
+            {
+                let payload = self.action_payload;
+                let emitter = self.action_emitter;
+
+                std::thread::spawn(move || match notification.show() {
+                    Ok(handle) => {
+                        let result = handle.wait_for_response(
+                            |response: &notify_rust::NotificationResponse| {
+                                let (action_id, input_value) = match response {
+                                    notify_rust::NotificationResponse::Default => ("tap", None),
+                                    notify_rust::NotificationResponse::Action(id) => {
+                                        (id.as_str(), None)
+                                    }
+                                    notify_rust::NotificationResponse::Reply(text) => {
+                                        ("tap", Some(text.clone()))
+                                    }
+                                    notify_rust::NotificationResponse::Closed(_) => {
+                                        ("dismiss", None)
+                                    }
+                                };
+                                if let (Some(p), Some(emit)) = (payload.as_ref(), emitter.as_ref())
+                                {
+                                    if let Err(e) = emit(action_id, input_value, p) {
+                                        log::error!("failed to emit actionPerformed: {e}");
+                                    }
+                                }
+                            },
+                        );
+                        if let Err(e) = result {
+                            log::error!("failed to wait for notification response: {e}");
+                        }
+                    }
+                    Err(e) => log::error!("failed to show notification: {e}"),
+                });
+            }
+
+            #[cfg(feature = "windows7-compat")]
+            {
+                tauri::async_runtime::spawn(async move {
+                    let _ = notification.show();
+                });
+            }
 
             Ok(())
         }
