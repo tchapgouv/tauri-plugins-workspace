@@ -9,9 +9,7 @@ import type { Options } from './index'
 interface ActionPerformedPayload {
   actionId: string
   inputValue?: string
-  notification?: {
-    id: number
-  }
+  id?: number
 }
 
 ;(function () {
@@ -80,17 +78,18 @@ interface ActionPerformedPayload {
     return listenerPromise
   }
 
-  function dispatch({ actionId, notification }: ActionPerformedPayload) {
-    console.log('[notification:frontend] dispatch called with actionId:', actionId, 'notificationId:', notification?.id)
-    console.log('[notification:frontend] registry size:', registry.size, 'keys:', Array.from(registry.keys()))
-    const target = registry.get(notification?.id as number)
+  function dispatch(payload: ActionPerformedPayload) {
+    const { actionId, id } = payload
+    const targetId = id
+    
+    console.log('[notification:frontend] dispatch called with actionId:', actionId, 'notificationId:', targetId)
+    const target = registry.get(targetId as number)
     if (!target) {
-      console.warn('[notification:frontend] no target found in registry for id:', notification?.id)
+      console.warn('[notification:frontend] no target found in registry for id:', targetId)
       return
     }
-    console.log('[notification:frontend] dispatching event to target:', actionId)
     if (actionId === 'dismiss') {
-      registry.delete(notification!.id)
+      registry.delete(targetId as number)
       target.dispatchEvent(new Event('close'))
     } else {
       target.dispatchEvent(new Event('click'))
