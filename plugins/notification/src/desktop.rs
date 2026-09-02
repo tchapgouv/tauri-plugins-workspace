@@ -3,24 +3,35 @@
 // SPDX-License-Identifier: MIT
 
 use serde::de::DeserializeOwned;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use tauri::{
+    ipc::Channel,
     plugin::{PermissionState, PluginApi},
     AppHandle, Runtime,
 };
 
 use crate::NotificationBuilder;
 
+type EventListeners = Arc<Mutex<HashMap<String, Vec<Channel<serde_json::Value>>>>>;
+
 pub fn init<R: Runtime, C: DeserializeOwned>(
     app: &AppHandle<R>,
     _api: PluginApi<R, C>,
 ) -> crate::Result<Notification<R>> {
-    Ok(Notification(app.clone()))
+    Ok(Notification {
+        app: app.clone(),
+        event_listeners: Arc::new(Mutex::new(HashMap::new())),
+    })
 }
 
 /// Access to the notification APIs.
 ///
 /// You can get an instance of this type via [`NotificationExt`](crate::NotificationExt)
-pub struct Notification<R: Runtime>(AppHandle<R>);
+pub struct Notification<R: Runtime> {
+    app: AppHandle<R>,
+    event_listeners: EventListeners,
+}
 
 impl<R: Runtime> crate::NotificationBuilder<R> {
     pub fn show(self) -> crate::Result<()> {
@@ -55,7 +66,7 @@ impl<R: Runtime> crate::NotificationBuilder<R> {
 
 impl<R: Runtime> Notification<R> {
     pub fn builder(&self) -> NotificationBuilder<R> {
-        NotificationBuilder::new(self.0.clone())
+        NotificationBuilder::new(self.app.clone())
     }
 
     pub fn request_permission(&self) -> crate::Result<PermissionState> {
@@ -64,6 +75,35 @@ impl<R: Runtime> Notification<R> {
 
     pub fn permission_state(&self) -> crate::Result<PermissionState> {
         Ok(PermissionState::Granted)
+    }
+
+    pub fn register_event_listener(
+        &self,
+        event: String,
+        channel: Channel<serde_json::Value>,
+    ) {
+        if let Ok(mut guard) = self.event_listeners.lock() {
+            guard.entry(event).or_default().push(channel);
+        }
+    }
+
+    pub fn remove_event_listener(&self, event: &str, channel_id: u32) {
+        if let Ok(mut guard) = self.event_listeners.lock() {
+            if let Some(channels) = guard.get_mut(event) {
+                channels.retain(|c| c.id() != channel_id);
+            }
+        }
+    }
+
+    #[allow(dead_code)]
+    fn emit_to_listeners(&self, event: &str, payload: serde_json::Value) {
+        if let Ok(guard) = self.event_listeners.lock() {
+            if let Some(channels) = guard.get(event) {
+                for channel in channels.clone() {
+                    let _ = channel.send(payload.clone());
+                }
+            }
+        }
     }
 }
 

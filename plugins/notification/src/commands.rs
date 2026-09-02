@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
-use tauri::{command, plugin::PermissionState, AppHandle, Runtime, State};
+use tauri::{command, ipc::Channel, plugin::PermissionState, AppHandle, Runtime, State};
 
 use crate::{Notification, NotificationData, Result};
 
@@ -36,4 +36,28 @@ pub(crate) async fn notify<R: Runtime>(
     let mut builder = notification.builder();
     builder.data = options;
     builder.show()
+}
+
+#[cfg(desktop)]
+#[command]
+pub(crate) async fn register_listener<R: Runtime>(
+    _app: AppHandle<R>,
+    notification: State<'_, Notification<R>>,
+    event: String,
+    handler: Channel<serde_json::Value>,
+) -> Result<()> {
+    notification.register_event_listener(event, handler);
+    Ok(())
+}
+
+#[cfg(desktop)]
+#[command]
+pub(crate) async fn remove_listener<R: Runtime>(
+    _app: AppHandle<R>,
+    notification: State<'_, Notification<R>>,
+    event: String,
+    channel_id: u32,
+) -> Result<()> {
+    notification.remove_event_listener(&event, channel_id);
+    Ok(())
 }
