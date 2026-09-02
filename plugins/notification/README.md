@@ -134,6 +134,27 @@ async function sendPlatformSpecificNotification() {
 }
 ```
 
+### Web Notification API
+
+On desktop the plugin injects a `window.Notification` shim that implements the standard Web Notification API, so code like this works unchanged:
+
+```javascript
+const notification = new Notification('Hello', { body: 'World' })
+notification.onclick = () => console.log('clicked')
+notification.onclose = () => console.log('closed')
+notification.close()
+```
+
+**Caveats:**
+
+- `close()` removes the JS-side handlers but does **not** withdraw an already displayed OS notification (not supported on Windows; retaining the handle on macOS would prevent the notification from appearing).
+- `onshow` and `onerror` never fire.
+- `tag` does not coalesce notifications.
+- `onclick` also fires for custom action buttons, since the Web API has a single activation concept.
+- On **Windows**, click/dismiss callbacks only work for **installed** apps with an AppUserModelID shortcut. In development (`cargo run`) the toast shows the PowerShell identity and callbacks may never fire.
+- On **macOS** in dev mode, notifications are attributed to `com.apple.Terminal`.
+- Each visible notification holds one blocked OS thread until it is acted on or expires.
+
 ## Contributing
 
 PRs accepted. Please make sure to read the Contributing Guide before making a pull request.
