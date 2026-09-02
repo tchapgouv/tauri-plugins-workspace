@@ -12,7 +12,9 @@ use tauri::{
     AppHandle, Runtime,
 };
 
-use crate::{models::ActionType, NotificationBuilder, NotificationExt};
+use crate::{
+    //models::ActionType,
+     NotificationBuilder, NotificationExt};
 
 /// Registered plugin event listeners, keyed by event name.
 type EventListeners = Arc<Mutex<HashMap<String, Vec<Channel<serde_json::Value>>>>>;
@@ -29,7 +31,7 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 /// You can get an instance of this type via [`NotificationExt`](crate::NotificationExt)
 pub struct Notification<R: Runtime> {
     app: AppHandle<R>,
-    action_types: Arc<Mutex<HashMap<String, ActionType>>>,
+    //action_types: Arc<Mutex<HashMap<String, ActionType>>>,
     event_listeners: EventListeners,
 }
 
@@ -37,7 +39,7 @@ impl<R: Runtime> Notification<R> {
     fn new(app: AppHandle<R>) -> Self {
         Self {
             app,
-            action_types: Arc::new(Mutex::new(HashMap::new())),
+            //action_types: Arc::new(Mutex::new(HashMap::new())),
             event_listeners: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -67,7 +69,7 @@ impl<R: Runtime> Notification<R> {
             }
         }
     }
-
+/*
     /// Registers action types for use with `actionTypeId` on desktop.
     pub fn register_action_types(&self, types: Vec<ActionType>) -> crate::Result<()> {
         let mut map = self.action_types.lock().unwrap();
@@ -76,7 +78,7 @@ impl<R: Runtime> Notification<R> {
         }
         Ok(())
     }
-
+ 
     /// Resolves the registered actions for a given action type id.
     #[allow(dead_code)]
     pub(crate) fn resolve_actions(&self, action_type_id: &str) -> Vec<(String, String)> {
@@ -92,6 +94,7 @@ impl<R: Runtime> Notification<R> {
             })
             .unwrap_or_default()
     }
+    */
 }
 
 /// Payload emitted on actionPerformed from the desktop backend.
@@ -113,7 +116,7 @@ impl<R: Runtime> crate::NotificationBuilder<R> {
         if let Some(title) = self
             .data
             .title
-            .clone()
+            .clone()    
             .or_else(|| self.app.config().product_name.clone())
         {
             notification = notification.title(title);
@@ -128,18 +131,20 @@ impl<R: Runtime> crate::NotificationBuilder<R> {
             notification = notification.sound(sound.clone());
         }
 
+        /*
         // Resolve registered action types (desktop support for registerActionTypes)
         if let Some(action_type_id) = self.data.action_type_id.as_deref() {
             let actions = self.app.notification().resolve_actions(action_type_id);
             notification = notification.actions(actions);
         }
-
+        */
         #[cfg(feature = "windows7-compat")]
         {
             notification.notify(&self.app)?;
         }
         #[cfg(not(feature = "windows7-compat"))]
         {
+            /*
             // Build the payload emitted when an action is performed
             let payload = ActionPerformedNotification {
                 id: self.data.id,
@@ -149,6 +154,7 @@ impl<R: Runtime> crate::NotificationBuilder<R> {
                 extra: self.data.extra.clone(),
             };
             notification = notification.action_payload(payload);
+ */
             let app_handle = self.app.clone();
             notification = notification.action_emitter(move |action_id, input_value, payload| {
                 emit_action_performed(&app_handle, action_id, input_value, payload)
@@ -206,6 +212,8 @@ mod imp {
 
     #[cfg(windows)]
     use std::path::MAIN_SEPARATOR as SEP;
+
+use notify_rust::{CloseReason, NotificationResponse};
 
     /// The desktop notification definition.
     ///
@@ -298,13 +306,14 @@ mod imp {
             self
         }
 
+        /*
         /// Sets the notification actions.
         #[must_use]
         pub fn actions(mut self, actions: Vec<(String, String)>) -> Self {
             self.actions = actions;
             self
         }
-
+        
         /// Sets the payload emitted when an action is performed.
         #[must_use]
         pub fn action_payload(
@@ -314,7 +323,7 @@ mod imp {
             self.action_payload = Some(payload);
             self
         }
-
+*/
         /// Sets the emitter callback invoked on user action.
         #[must_use]
         pub fn action_emitter(
@@ -409,6 +418,29 @@ mod imp {
             let payload = self.action_payload;
             let emitter = self.action_emitter;
 
+            println!("show notification");
+
+
+            
+            tauri::async_runtime::spawn(async move {
+                            let _ = notification
+                .show()
+                .unwrap()
+                .wait_for_response(|response: &NotificationResponse| match response {
+                    NotificationResponse::Default => println!("body clicked"),
+                    NotificationResponse::Action(key) => println!("button {key:?} clicked"),
+                    // inline replies only come from the macOS `preview-macos-un` backend
+                    NotificationResponse::Reply(text) => println!("user replied: {text}"),
+                    // no more hardcoded `"__closed"`, the close reason is typed
+                    NotificationResponse::Closed(CloseReason::Dismissed) => {
+                        println!("dismissed by the user")
+                    }
+                    NotificationResponse::Closed(reason) => println!("closed: {reason:?}"),
+                })
+                .unwrap();
+            });
+
+/*
             std::thread::spawn(move || match notification.show() {
                 Ok(handle) => {
                     let result =
@@ -437,7 +469,7 @@ mod imp {
                 }
                 Err(e) => log::error!("failed to show notification: {e}"),
             });
-
+ */
             Ok(())
         }
 

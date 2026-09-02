@@ -49,7 +49,9 @@ win7-notifications = { version = "0.4.5", optional = true }
 windows-version = { version = "0.1", optional = true }
 
 [target."cfg(any(target_os = \"macos\", windows, target_os = \"linux\", target_os = \"dragonfly\", target_os = \"freebsd\", target_os = \"openbsd\", target_os = \"netbsd\"))".dependencies]
-notify-rust = "4.18"
+notify-rust = {version = "4.18", features=[
+  "preview-macos-un"
+  ]}
 
 [features]
 windows7-compat = ["win7-notifications", "windows-version"]

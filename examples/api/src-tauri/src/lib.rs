@@ -27,6 +27,7 @@ pub fn run() {
         .plugin(
             tauri_plugin_log::Builder::default()
                 .level(log::LevelFilter::Info)
+                .level_for("notify_rust", log::LevelFilter::Trace)
                 .build(),
         )
         .plugin(tauri_plugin_fs::init())

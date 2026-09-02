@@ -4,7 +4,8 @@
 
 use tauri::{command, ipc::Channel, plugin::PermissionState, AppHandle, Runtime, State};
 
-use crate::{models::ActionType, ActiveNotification, Notification, NotificationData, Result};
+use crate::{//models::ActionType, 
+    ActiveNotification, Notification, NotificationData, Result};
 
 #[command]
 pub(crate) async fn is_permission_granted<R: Runtime>(
@@ -37,7 +38,7 @@ pub(crate) async fn notify<R: Runtime>(
     builder.data = options;
     builder.show()
 }
-
+/*
 #[cfg(desktop)]
 #[command]
 pub(crate) async fn register_action_types<R: Runtime>(
@@ -47,6 +48,7 @@ pub(crate) async fn register_action_types<R: Runtime>(
 ) -> Result<()> {
     notification.register_action_types(types)
 }
+ */
 
 #[cfg(desktop)]
 #[command]
@@ -72,6 +74,7 @@ pub(crate) async fn remove_listener<R: Runtime>(
     Ok(())
 }
 
+/*
 #[cfg(desktop)]
 #[command]
 pub(crate) async fn get_active<R: Runtime>(
@@ -90,3 +93,4 @@ pub(crate) async fn remove_active<R: Runtime>(
 ) -> Result<()> {
     Ok(())
 }
+ */

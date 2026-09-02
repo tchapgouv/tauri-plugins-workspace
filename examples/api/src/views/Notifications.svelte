@@ -6,7 +6,7 @@
   } from '@tauri-apps/plugin-notification'
   export let onMessage
 
-  Notification.requestPermission();
+  //Notification.requestPermission();
 
   let sound = ''
   let actionTypesRegistered = false
@@ -42,6 +42,7 @@
     }
   }
 
+  /*
   async function setupActionTypes() {
     await registerActionTypes([
       {
@@ -52,6 +53,7 @@
     actionTypesRegistered = true
     onMessage('Action types registered')
   }
+    */
 
   async function setupActionListener() {
     await setOnActionPerformed((action) => {
@@ -79,7 +81,7 @@
   placeholder="Notification sound..."
   bind:value={sound}
 />
-<button class="btn" id="notification" on:click={triggerNotification}>
+<button class="btn" id="notification" on:click={_sendNotification}>
   Send test notification
 </button>
 

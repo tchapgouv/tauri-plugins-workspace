@@ -20,6 +20,7 @@
   import FileSystem from './views/FileSystem.svelte'
   import Http from './views/Http.svelte'
   import Notifications from './views/Notifications.svelte'
+  import NotificationsTchap from './views/Notifications-tchap.svelte'
   import Shortcuts from './views/Shortcuts.svelte'
   import Shell from './views/Shell.svelte'
   import Opener from './views/Opener.svelte'
@@ -90,6 +91,11 @@
       label: 'Notifications',
       component: Notifications,
       icon: 'i-codicon-bell-dot'
+    },
+    {
+      label: 'Notifications (Tchap)',
+      component: NotificationsTchap,
+      icon: 'i-codicon-bell'
     },
     !isMobile && {
       label: 'Shortcuts',
