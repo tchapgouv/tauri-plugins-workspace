@@ -15,6 +15,7 @@
         })
         .catch(onMessage)
     } else if (Notification.permission === 'granted') {
+      onMessage('granted')
       _sendNotification()
     } else {
       onMessage('Permission is denied')

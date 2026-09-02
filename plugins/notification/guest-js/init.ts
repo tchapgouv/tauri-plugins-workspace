@@ -66,21 +66,29 @@ interface ActionPerformedPayload {
   let listenerPromise: Promise<unknown> | null = null
 
   function ensureListener() {
+    console.log('[notification:frontend] ensureListener called')
     listenerPromise ??= addPluginListener(
       'notification',
       'actionPerformed',
       (payload: ActionPerformedPayload) => {
+        console.log('[notification:frontend] actionPerformed received:', payload)
         dispatch(payload)
       }
     ).catch((error) => {
-      console.error('failed to listen to notification actions', error)
+      console.error('[notification:frontend] failed to listen to notification actions', error)
     })
     return listenerPromise
   }
 
   function dispatch({ actionId, notification }: ActionPerformedPayload) {
+    console.log('[notification:frontend] dispatch called with actionId:', actionId, 'notificationId:', notification?.id)
+    console.log('[notification:frontend] registry size:', registry.size, 'keys:', Array.from(registry.keys()))
     const target = registry.get(notification?.id as number)
-    if (!target) return
+    if (!target) {
+      console.warn('[notification:frontend] no target found in registry for id:', notification?.id)
+      return
+    }
+    console.log('[notification:frontend] dispatching event to target:', actionId)
     if (actionId === 'dismiss') {
       registry.delete(notification!.id)
       target.dispatchEvent(new Event('close'))
@@ -111,10 +119,19 @@ interface ActionPerformedPayload {
       this.tag = options.tag ?? ''
       this.data = options.data ?? null
       this.#id = nextId++
-      this.addEventListener('click', (ev) => this.onclick?.call(this, ev))
-      this.addEventListener('close', (ev) => this.onclose?.call(this, ev))
+      console.log('[notification:frontend] TauriNotification created with id:', this.#id, 'title:', title)
+      this.addEventListener('click', (ev) => {
+        console.log('[notification:frontend] click event dispatched for id:', this.#id)
+        this.onclick?.call(this, ev)
+      })
+      this.addEventListener('close', (ev) => {
+        console.log('[notification:frontend] close event dispatched for id:', this.#id)
+        this.onclose?.call(this, ev)
+      })
       registry.set(this.#id, this)
+      console.log('[notification:frontend] notification registered, registry size:', registry.size)
       void ensureListener()
+      console.log('[notification:frontend] sending notification to backend with id:', this.#id)
       void sendNotification({ ...options, id: this.#id, title } as Options)
     }
 

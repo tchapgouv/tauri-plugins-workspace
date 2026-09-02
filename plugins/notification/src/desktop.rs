@@ -33,6 +33,7 @@ fn emit_action_performed<R: Runtime>(
     input_value: Option<String>,
     payload: &ActionPerformedNotification,
 ) -> crate::Result<()> {
+    log::info!("[notification:backend] emit_action_performed called: action_id={}, notification_id={}", action_id, payload.id);
     let notification = app.state::<Notification<R>>().inner();
     let mut value = serde_json::to_value(payload)?;
     if let serde_json::Value::Object(ref mut map) = value {
@@ -41,6 +42,7 @@ fn emit_action_performed<R: Runtime>(
             map.insert("inputValue".to_string(), v.into());
         }
     }
+    log::info!("[notification:backend] emitting to listeners: event=actionPerformed, value={}", value);
     notification.emit_to_listeners("actionPerformed", value);
     Ok(())
 }
@@ -87,6 +89,7 @@ impl<R: Runtime> crate::NotificationBuilder<R> {
 
         #[cfg(not(feature = "windows7-compat"))]
         {
+            log::info!("[notification:backend] showing notification with id: {}", self.data.id);
             let payload = ActionPerformedNotification {
                 id: self.data.id,
                 title: self.data.title.clone(),
@@ -97,6 +100,8 @@ impl<R: Runtime> crate::NotificationBuilder<R> {
             let app_handle = self.app.clone();
             notification = notification.action_payload(payload).action_emitter(
                 move |action_id, input_value, payload| {
+                    log::info!("[notification:backend] action received from OS: id={}, action_id={:?}, input_value={:?}",
+                        payload.id, action_id, input_value);
                     emit_action_performed(&app_handle, action_id, input_value, payload)
                 },
             );
@@ -142,12 +147,18 @@ impl<R: Runtime> Notification<R> {
 
     #[allow(dead_code)]
     fn emit_to_listeners(&self, event: &str, payload: serde_json::Value) {
+        log::info!("[notification:backend] emit_to_listeners called: event={}, payload={}", event, payload);
         if let Ok(guard) = self.event_listeners.lock() {
+            let channel_count = guard.get(event).map(|c| c.len()).unwrap_or(0);
+            log::info!("[notification:backend] found {} channels for event {}", channel_count, event);
             if let Some(channels) = guard.get(event) {
-                for channel in channels.clone() {
+                for (idx, channel) in channels.clone().iter().enumerate() {
+                    log::info!("[notification:backend] sending to channel {}/{}", idx + 1, channels.len());
                     let _ = channel.send(payload.clone());
                 }
             }
+        } else {
+            log::warn!("[notification:backend] failed to lock event_listeners");
         }
     }
 }
@@ -353,35 +364,42 @@ mod imp {
                 let payload = self.action_payload;
                 let emitter = self.action_emitter;
 
-                std::thread::spawn(move || match notification.show() {
-                    Ok(handle) => {
-                        let result = handle.wait_for_response(
-                            |response: &notify_rust::NotificationResponse| {
-                                let (action_id, input_value) = match response {
-                                    notify_rust::NotificationResponse::Default => ("tap", None),
-                                    notify_rust::NotificationResponse::Action(id) => {
-                                        (id.as_str(), None)
+                std::thread::spawn(move || {
+                    eprintln!("[notification:backend] spawn: calling notification.show()...");
+                    match notification.show() {
+                        Ok(handle) => {
+                            eprintln!("[notification:backend] spawn: show() returned handle, calling wait_for_response...");
+                            let result = handle.wait_for_response(
+                                |response: &notify_rust::NotificationResponse| {
+                                    eprintln!("[notification:backend] wait_for_response callback fired: {:?}", response);
+                                    let (action_id, input_value) = match response {
+                                        notify_rust::NotificationResponse::Default => ("tap", None),
+                                        notify_rust::NotificationResponse::Action(id) => {
+                                            (id.as_str(), None)
+                                        }
+                                        notify_rust::NotificationResponse::Reply(text) => {
+                                            ("tap", Some(text.clone()))
+                                        }
+                                        notify_rust::NotificationResponse::Closed(_) => {
+                                            ("dismiss", None)
+                                        }
+                                    };
+                                    eprintln!("[notification:backend] mapped response to action_id={}", action_id);
+                                    if let (Some(p), Some(emit)) = (payload.as_ref(), emitter.as_ref())
+                                    {
+                                        if let Err(e) = emit(action_id, input_value, p) {
+                                            eprintln!("[notification:backend] failed to emit actionPerformed: {e}");
+                                        }
                                     }
-                                    notify_rust::NotificationResponse::Reply(text) => {
-                                        ("tap", Some(text.clone()))
-                                    }
-                                    notify_rust::NotificationResponse::Closed(_) => {
-                                        ("dismiss", None)
-                                    }
-                                };
-                                if let (Some(p), Some(emit)) = (payload.as_ref(), emitter.as_ref())
-                                {
-                                    if let Err(e) = emit(action_id, input_value, p) {
-                                        log::error!("failed to emit actionPerformed: {e}");
-                                    }
-                                }
-                            },
-                        );
-                        if let Err(e) = result {
-                            log::error!("failed to wait for notification response: {e}");
+                                },
+                            );
+                            eprintln!("[notification:backend] wait_for_response returned: {:?}", result);
+                            if let Err(e) = result {
+                                eprintln!("[notification:backend] failed to wait for notification response: {e}");
+                            }
                         }
+                        Err(e) => eprintln!("[notification:backend] failed to show notification: {e}"),
                     }
-                    Err(e) => log::error!("failed to show notification: {e}"),
                 });
             }
 

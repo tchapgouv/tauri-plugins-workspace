@@ -33,6 +33,7 @@ pub(crate) async fn notify<R: Runtime>(
     notification: State<'_, Notification<R>>,
     options: NotificationData,
 ) -> Result<()> {
+    log::info!("[notification:backend] notify called with id: {:?}, title: {:?}", options.id, options.title);
     let mut builder = notification.builder();
     builder.data = options;
     builder.show()
@@ -46,6 +47,7 @@ pub(crate) async fn register_listener<R: Runtime>(
     event: String,
     handler: Channel<serde_json::Value>,
 ) -> Result<()> {
+    log::info!("[notification:backend] register_listener called for event: {}", event);
     notification.register_event_listener(event, handler);
     Ok(())
 }
@@ -58,6 +60,7 @@ pub(crate) async fn remove_listener<R: Runtime>(
     event: String,
     channel_id: u32,
 ) -> Result<()> {
+    log::info!("[notification:backend] remove_listener called for event: {} channel_id: {}", event, channel_id);
     notification.remove_event_listener(&event, channel_id);
     Ok(())
 }
